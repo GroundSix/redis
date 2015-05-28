@@ -1,10 +1,20 @@
 package redis // import "gopkg.in/redis.v3"
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"time"
+)
+
+var (
+	// Marshal is used whenever client needs to marshal struct or
+	// slice into a binary form.
+	Marshal = json.Marshal
+	// Unmarshal is used whenever client needs to unmarshal a binary
+	// representation of struct or slice.
+	Unmarshal = json.Unmarshal
 )
 
 type baseClient struct {

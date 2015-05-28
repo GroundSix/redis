@@ -7,12 +7,16 @@ import (
 	"time"
 )
 
-func formatFloat(f float64) string {
-	return strconv.FormatFloat(f, 'f', -1, 64)
-}
-
 func formatInt(i int64) string {
 	return strconv.FormatInt(i, 10)
+}
+
+func formatUint(i uint64) string {
+	return strconv.FormatUint(i, 10)
+}
+
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
 func readTimeout(timeout time.Duration) time.Duration {
@@ -20,14 +24,6 @@ func readTimeout(timeout time.Duration) time.Duration {
 		return 0
 	}
 	return timeout + time.Second
-}
-
-type commandable struct {
-	process func(cmd Cmder)
-}
-
-func (c *commandable) Process(cmd Cmder) {
-	c.process(cmd)
 }
 
 func usePrecise(dur time.Duration) bool {
@@ -52,6 +48,61 @@ func formatSec(dur time.Duration) string {
 		)
 	}
 	return strconv.FormatInt(int64(dur/time.Second), 10)
+}
+
+func stringify(vv interface{}) (string, error) {
+	switch v := vv.(type) {
+	case nil:
+		return "", nil
+	case string:
+		return v, nil
+	case []byte:
+		return string(v), nil
+	case int:
+		return formatInt(int64(v)), nil
+	case int8:
+		return formatInt(int64(v)), nil
+	case int16:
+		return formatInt(int64(v)), nil
+	case int32:
+		return formatInt(int64(v)), nil
+	case int64:
+		return formatInt(v), nil
+	case uint:
+		return formatUint(uint64(v)), nil
+	case uint8:
+		return formatUint(uint64(v)), nil
+	case uint16:
+		return formatUint(uint64(v)), nil
+	case uint32:
+		return formatUint(uint64(v)), nil
+	case uint64:
+		return formatUint(v), nil
+	case float32:
+		return formatFloat(float64(v)), nil
+	case float64:
+		return formatFloat(v), nil
+	case bool:
+		if v {
+			return "1", nil
+		} else {
+			return "0", nil
+		}
+	default:
+		b, err := Marshal(vv)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	}
+}
+
+type commandable struct {
+	process func(cmd Cmder)
+}
+
+func (c *commandable) Process(cmd Cmder) {
+	c.process(cmd)
 }
 
 //------------------------------------------------------------------------------
@@ -425,9 +476,14 @@ func (c *commandable) GetRange(key string, start, end int64) *StringCmd {
 	return cmd
 }
 
-func (c *commandable) GetSet(key, value string) *StringCmd {
-	cmd := NewStringCmd("GETSET", key, value)
-	c.Process(cmd)
+func (c *commandable) GetSet(key string, value interface{}) *StringCmd {
+	valueStr, valueErr := stringify(value)
+	cmd := NewStringCmd("GETSET", key, valueStr)
+	if valueErr != nil {
+		cmd.setErr(valueErr)
+	} else {
+		c.Process(cmd)
+	}
 	return cmd
 }
 
@@ -470,8 +526,9 @@ func (c *commandable) MSetNX(pairs ...string) *BoolCmd {
 	return cmd
 }
 
-func (c *commandable) Set(key, value string, expiration time.Duration) *StatusCmd {
-	args := []string{"SET", key, value}
+func (c *commandable) Set(key string, value interface{}, expiration time.Duration) *StatusCmd {
+	valueStr, valueErr := stringify(value)
+	args := []string{"SET", key, valueStr}
 	if expiration > 0 {
 		if usePrecise(expiration) {
 			args = append(args, "PX", formatMs(expiration))
@@ -480,7 +537,11 @@ func (c *commandable) Set(key, value string, expiration time.Duration) *StatusCm
 		}
 	}
 	cmd := NewStatusCmd(args...)
-	c.Process(cmd)
+	if valueErr != nil {
+		cmd.setErr(valueErr)
+	} else {
+		c.Process(cmd)
+	}
 	return cmd
 }
 
@@ -495,30 +556,40 @@ func (c *commandable) SetBit(key string, offset int64, value int) *IntCmd {
 	return cmd
 }
 
-func (c *commandable) SetNX(key, value string, expiration time.Duration) *BoolCmd {
+func (c *commandable) SetNX(key string, value interface{}, expiration time.Duration) *BoolCmd {
 	var cmd *BoolCmd
+	valueStr, valueErr := stringify(value)
 	if expiration == 0 {
 		// Use old `SETNX` to support old Redis versions.
-		cmd = NewBoolCmd("SETNX", key, value)
+		cmd = NewBoolCmd("SETNX", key, valueStr)
 	} else {
 		if usePrecise(expiration) {
-			cmd = NewBoolCmd("SET", key, value, "PX", formatMs(expiration), "NX")
+			cmd = NewBoolCmd("SET", key, valueStr, "PX", formatMs(expiration), "NX")
 		} else {
-			cmd = NewBoolCmd("SET", key, value, "EX", formatSec(expiration), "NX")
+			cmd = NewBoolCmd("SET", key, valueStr, "EX", formatSec(expiration), "NX")
 		}
 	}
-	c.Process(cmd)
+	if valueErr != nil {
+		cmd.setErr(valueErr)
+	} else {
+		c.Process(cmd)
+	}
 	return cmd
 }
 
-func (c *Client) SetXX(key, value string, expiration time.Duration) *BoolCmd {
+func (c *Client) SetXX(key string, value interface{}, expiration time.Duration) *BoolCmd {
 	var cmd *BoolCmd
+	valueStr, valueErr := stringify(value)
 	if usePrecise(expiration) {
-		cmd = NewBoolCmd("SET", key, value, "PX", formatMs(expiration), "XX")
+		cmd = NewBoolCmd("SET", key, valueStr, "PX", formatMs(expiration), "XX")
 	} else {
-		cmd = NewBoolCmd("SET", key, value, "EX", formatSec(expiration), "XX")
+		cmd = NewBoolCmd("SET", key, valueStr, "EX", formatSec(expiration), "XX")
 	}
-	c.Process(cmd)
+	if valueErr != nil {
+		cmd.setErr(valueErr)
+	} else {
+		c.Process(cmd)
+	}
 	return cmd
 }
 

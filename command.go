@@ -411,6 +411,102 @@ func (cmd *StringCmd) Float64() (float64, error) {
 	return strconv.ParseFloat(cmd.val, 64)
 }
 
+func (cmd *StringCmd) Scan(vv interface{}) error {
+	switch v := vv.(type) {
+	case nil:
+		return errorf("redis: Scan(nil)")
+	case *string:
+		*v = cmd.val
+		return nil
+	case *[]byte:
+		*v = []byte(cmd.val)
+		return nil
+	case *int:
+		var err error
+		*v, err = strconv.Atoi(cmd.val)
+		return err
+	case *int8:
+		n, err := strconv.ParseInt(cmd.val, 10, 8)
+		if err != nil {
+			return err
+		}
+		*v = int8(n)
+		return nil
+	case *int16:
+		n, err := strconv.ParseInt(cmd.val, 10, 16)
+		if err != nil {
+			return err
+		}
+		*v = int16(n)
+		return nil
+	case *int32:
+		n, err := strconv.ParseInt(cmd.val, 10, 16)
+		if err != nil {
+			return err
+		}
+		*v = int32(n)
+		return nil
+	case *int64:
+		n, err := strconv.ParseInt(cmd.val, 10, 64)
+		if err != nil {
+			return err
+		}
+		*v = n
+		return nil
+	case *uint:
+		n, err := strconv.ParseUint(cmd.val, 10, 64)
+		if err != nil {
+			return err
+		}
+		*v = uint(n)
+		return nil
+	case *uint8:
+		n, err := strconv.ParseUint(cmd.val, 10, 8)
+		if err != nil {
+			return err
+		}
+		*v = uint8(n)
+		return nil
+	case *uint16:
+		n, err := strconv.ParseUint(cmd.val, 10, 16)
+		if err != nil {
+			return err
+		}
+		*v = uint16(n)
+		return nil
+	case *uint32:
+		n, err := strconv.ParseUint(cmd.val, 10, 32)
+		if err != nil {
+			return err
+		}
+		*v = uint32(n)
+		return nil
+	case *uint64:
+		n, err := strconv.ParseUint(cmd.val, 10, 64)
+		if err != nil {
+			return err
+		}
+		*v = n
+		return nil
+	case *float32:
+		n, err := strconv.ParseFloat(cmd.val, 32)
+		if err != nil {
+			return err
+		}
+		*v = float32(n)
+		return err
+	case *float64:
+		var err error
+		*v, err = strconv.ParseFloat(cmd.val, 64)
+		return err
+	case *bool:
+		*v = cmd.val == "1"
+		return nil
+	default:
+		return Unmarshal([]byte(cmd.val), v)
+	}
+}
+
 func (cmd *StringCmd) String() string {
 	return cmdString(cmd, cmd.val)
 }
