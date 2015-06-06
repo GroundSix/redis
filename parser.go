@@ -17,18 +17,84 @@ var (
 
 //------------------------------------------------------------------------------
 
-func appendArgs(buf []byte, args []string) []byte {
-	buf = append(buf, '*')
-	buf = strconv.AppendUint(buf, uint64(len(args)), 10)
-	buf = append(buf, '\r', '\n')
-	for _, arg := range args {
-		buf = append(buf, '$')
-		buf = strconv.AppendUint(buf, uint64(len(arg)), 10)
-		buf = append(buf, '\r', '\n')
-		buf = append(buf, arg...)
-		buf = append(buf, '\r', '\n')
+func appendString(b []byte, s string) []byte {
+	b = append(b, '$')
+	b = strconv.AppendUint(b, uint64(len(s)), 10)
+	b = append(b, '\r', '\n')
+	b = append(b, s...)
+	b = append(b, '\r', '\n')
+	return b
+}
+
+func appendBytes(b, bb []byte) []byte {
+	b = append(b, '$')
+	b = strconv.AppendUint(b, uint64(len(bb)), 10)
+	b = append(b, '\r', '\n')
+	b = append(b, bb...)
+	b = append(b, '\r', '\n')
+	return b
+}
+
+func appendArg(b []byte, arg interface{}) ([]byte, error) {
+	switch v := arg.(type) {
+	case nil:
+		b = appendString(b, "")
+	case string:
+		b = appendString(b, v)
+	case []byte:
+		b = appendBytes(b, v)
+	case int:
+		b = appendString(b, formatInt(int64(v)))
+	case int8:
+		b = appendString(b, formatInt(int64(v)))
+	case int16:
+		b = appendString(b, formatInt(int64(v)))
+	case int32:
+		b = appendString(b, formatInt(int64(v)))
+	case int64:
+		b = appendString(b, formatInt(v))
+	case uint:
+		b = appendString(b, formatUint(uint64(v)))
+	case uint8:
+		b = appendString(b, formatUint(uint64(v)))
+	case uint16:
+		b = appendString(b, formatUint(uint64(v)))
+	case uint32:
+		b = appendString(b, formatUint(uint64(v)))
+	case uint64:
+		b = appendString(b, formatUint(v))
+	case float32:
+		b = appendString(b, formatFloat(float64(v)))
+	case float64:
+		b = appendString(b, formatFloat(v))
+	case bool:
+		if v {
+			b = appendString(b, "1")
+		} else {
+			b = appendString(b, "0")
+		}
+	default:
+		bb, err := Marshal(arg)
+		if err != nil {
+			return nil, err
+		}
+		b = appendBytes(b, bb)
 	}
-	return buf
+	return b, nil
+}
+
+func appendArgs(b []byte, args []interface{}) ([]byte, error) {
+	b = append(b, '*')
+	b = strconv.AppendUint(b, uint64(len(args)), 10)
+	b = append(b, '\r', '\n')
+	for _, arg := range args {
+		var err error
+		b, err = appendArg(b, arg)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return b, nil
 }
 
 //------------------------------------------------------------------------------

@@ -28,7 +28,7 @@ var (
 )
 
 type Cmder interface {
-	args() []string
+	args() []interface{}
 	parseReply(*bufio.Reader) error
 	setErr(error)
 	reset()
@@ -54,7 +54,11 @@ func resetCmds(cmds []Cmder) {
 }
 
 func cmdString(cmd Cmder, val interface{}) string {
-	s := strings.Join(cmd.args(), " ")
+	var ss []string
+	for _, arg := range cmd.args() {
+		ss = append(ss, fmt.Sprint(arg))
+	}
+	s := strings.Join(ss, " ")
 	if err := cmd.Err(); err != nil {
 		return s + ": " + err.Error()
 	}
@@ -68,7 +72,7 @@ func cmdString(cmd Cmder, val interface{}) string {
 //------------------------------------------------------------------------------
 
 type baseCmd struct {
-	_args []string
+	_args []interface{}
 
 	err error
 
@@ -84,7 +88,7 @@ func (cmd *baseCmd) Err() error {
 	return nil
 }
 
-func (cmd *baseCmd) args() []string {
+func (cmd *baseCmd) args() []interface{} {
 	return cmd._args
 }
 
@@ -102,7 +106,7 @@ func (cmd *baseCmd) writeTimeout() *time.Duration {
 
 func (cmd *baseCmd) clusterKey() string {
 	if cmd._clusterKeyPos > 0 && cmd._clusterKeyPos < len(cmd._args) {
-		return cmd._args[cmd._clusterKeyPos]
+		return fmt.Sprint(cmd._args[cmd._clusterKeyPos])
 	}
 	return ""
 }
@@ -123,7 +127,7 @@ type Cmd struct {
 	val interface{}
 }
 
-func NewCmd(args ...string) *Cmd {
+func NewCmd(args ...interface{}) *Cmd {
 	return &Cmd{baseCmd: baseCmd{_args: args}}
 }
 
@@ -157,7 +161,7 @@ type SliceCmd struct {
 	val []interface{}
 }
 
-func NewSliceCmd(args ...string) *SliceCmd {
+func NewSliceCmd(args ...interface{}) *SliceCmd {
 	return &SliceCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -196,11 +200,11 @@ type StatusCmd struct {
 	val string
 }
 
-func NewStatusCmd(args ...string) *StatusCmd {
+func NewStatusCmd(args ...interface{}) *StatusCmd {
 	return &StatusCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
-func newKeylessStatusCmd(args ...string) *StatusCmd {
+func newKeylessStatusCmd(args ...interface{}) *StatusCmd {
 	return &StatusCmd{baseCmd: baseCmd{_args: args}}
 }
 
@@ -239,7 +243,7 @@ type IntCmd struct {
 	val int64
 }
 
-func NewIntCmd(args ...string) *IntCmd {
+func NewIntCmd(args ...interface{}) *IntCmd {
 	return &IntCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -279,7 +283,7 @@ type DurationCmd struct {
 	precision time.Duration
 }
 
-func NewDurationCmd(precision time.Duration, args ...string) *DurationCmd {
+func NewDurationCmd(precision time.Duration, args ...interface{}) *DurationCmd {
 	return &DurationCmd{
 		precision: precision,
 		baseCmd:   baseCmd{_args: args, _clusterKeyPos: 1},
@@ -321,7 +325,7 @@ type BoolCmd struct {
 	val bool
 }
 
-func NewBoolCmd(args ...string) *BoolCmd {
+func NewBoolCmd(args ...interface{}) *BoolCmd {
 	return &BoolCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -373,7 +377,7 @@ type StringCmd struct {
 	val string
 }
 
-func NewStringCmd(args ...string) *StringCmd {
+func NewStringCmd(args ...interface{}) *StringCmd {
 	return &StringCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -529,7 +533,7 @@ type FloatCmd struct {
 	val float64
 }
 
-func NewFloatCmd(args ...string) *FloatCmd {
+func NewFloatCmd(args ...interface{}) *FloatCmd {
 	return &FloatCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -564,7 +568,7 @@ type StringSliceCmd struct {
 	val []string
 }
 
-func NewStringSliceCmd(args ...string) *StringSliceCmd {
+func NewStringSliceCmd(args ...interface{}) *StringSliceCmd {
 	return &StringSliceCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -603,7 +607,7 @@ type BoolSliceCmd struct {
 	val []bool
 }
 
-func NewBoolSliceCmd(args ...string) *BoolSliceCmd {
+func NewBoolSliceCmd(args ...interface{}) *BoolSliceCmd {
 	return &BoolSliceCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -642,7 +646,7 @@ type StringStringMapCmd struct {
 	val map[string]string
 }
 
-func NewStringStringMapCmd(args ...string) *StringStringMapCmd {
+func NewStringStringMapCmd(args ...interface{}) *StringStringMapCmd {
 	return &StringStringMapCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -681,7 +685,7 @@ type StringIntMapCmd struct {
 	val map[string]int64
 }
 
-func NewStringIntMapCmd(args ...string) *StringIntMapCmd {
+func NewStringIntMapCmd(args ...interface{}) *StringIntMapCmd {
 	return &StringIntMapCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -720,7 +724,7 @@ type ZSliceCmd struct {
 	val []Z
 }
 
-func NewZSliceCmd(args ...string) *ZSliceCmd {
+func NewZSliceCmd(args ...interface{}) *ZSliceCmd {
 	return &ZSliceCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -760,7 +764,7 @@ type ScanCmd struct {
 	keys   []string
 }
 
-func NewScanCmd(args ...string) *ScanCmd {
+func NewScanCmd(args ...interface{}) *ScanCmd {
 	return &ScanCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
@@ -816,7 +820,7 @@ type ClusterSlotCmd struct {
 	val []ClusterSlotInfo
 }
 
-func NewClusterSlotCmd(args ...string) *ClusterSlotCmd {
+func NewClusterSlotCmd(args ...interface{}) *ClusterSlotCmd {
 	return &ClusterSlotCmd{baseCmd: baseCmd{_args: args, _clusterKeyPos: 1}}
 }
 
