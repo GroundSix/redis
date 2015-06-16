@@ -80,11 +80,11 @@ func (c *PubSub) ReceiveTimeout(timeout time.Duration) (interface{}, error) {
 
 	reply := cmd.Val()
 
-	msgName := reply[0].(string)
-	switch msgName {
+	kind := reply[0].(string)
+	switch kind {
 	case "subscribe", "unsubscribe", "psubscribe", "punsubscribe":
 		return &Subscription{
-			Kind:    msgName,
+			Kind:    kind,
 			Channel: reply[1].(string),
 			Count:   int(reply[2].(int64)),
 		}, nil
@@ -101,7 +101,7 @@ func (c *PubSub) ReceiveTimeout(timeout time.Duration) (interface{}, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("redis: unsupported message name: %q", msgName)
+	return nil, fmt.Errorf("redis: unsupported pubsub notification: %q", kind)
 }
 
 func (c *PubSub) subscribe(cmd string, channels ...string) error {

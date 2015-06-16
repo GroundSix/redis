@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ type Cmder interface {
 	clusterKey() string
 
 	Err() error
-	String() string
+	fmt.Stringer
 }
 
 func setCmdsErr(cmds []Cmder, e error) {
@@ -63,7 +64,12 @@ func cmdString(cmd Cmder, val interface{}) string {
 		return s + ": " + err.Error()
 	}
 	if val != nil {
-		return s + ": " + fmt.Sprint(val)
+		switch vv := val.(type) {
+		case []byte:
+			return s + ": " + string(vv)
+		default:
+			return s + ": " + fmt.Sprint(val)
+		}
 	}
 	return s
 
@@ -150,6 +156,10 @@ func (cmd *Cmd) String() string {
 
 func (cmd *Cmd) parseReply(rd *bufio.Reader) error {
 	cmd.val, cmd.err = parseReply(rd, parseSlice)
+	// TODO: remove in v4 to save byte -> string conversion
+	if v, ok := cmd.val.([]byte); ok {
+		cmd.val = string(v)
+	}
 	return cmd.err
 }
 
@@ -231,7 +241,7 @@ func (cmd *StatusCmd) parseReply(rd *bufio.Reader) error {
 		cmd.err = err
 		return err
 	}
-	cmd.val = v.(string)
+	cmd.val = string(v.([]byte))
 	return nil
 }
 
@@ -346,6 +356,8 @@ func (cmd *BoolCmd) String() string {
 	return cmdString(cmd, cmd.val)
 }
 
+var ok = []byte("OK")
+
 func (cmd *BoolCmd) parseReply(rd *bufio.Reader) error {
 	v, err := parseReply(rd, nil)
 	// `SET key value NX` returns nil when key already exists.
@@ -361,8 +373,8 @@ func (cmd *BoolCmd) parseReply(rd *bufio.Reader) error {
 	case int64:
 		cmd.val = vv == 1
 		return nil
-	case string:
-		cmd.val = vv == "OK"
+	case []byte:
+		cmd.val = bytes.Equal(vv, ok)
 		return nil
 	default:
 		return fmt.Errorf("got %T, wanted int64 or string")
@@ -374,7 +386,7 @@ func (cmd *BoolCmd) parseReply(rd *bufio.Reader) error {
 type StringCmd struct {
 	baseCmd
 
-	val string
+	val []byte
 }
 
 func NewStringCmd(args ...interface{}) *StringCmd {
@@ -382,118 +394,121 @@ func NewStringCmd(args ...interface{}) *StringCmd {
 }
 
 func (cmd *StringCmd) reset() {
-	cmd.val = ""
+	cmd.val = nil
 	cmd.err = nil
 }
 
 func (cmd *StringCmd) Val() string {
-	return cmd.val
+	return string(cmd.val)
 }
 
 func (cmd *StringCmd) Result() (string, error) {
-	return cmd.val, cmd.err
+	return cmd.Val(), cmd.err
 }
 
 func (cmd *StringCmd) Int64() (int64, error) {
 	if cmd.err != nil {
 		return 0, cmd.err
 	}
-	return strconv.ParseInt(cmd.val, 10, 64)
+	return strconv.ParseInt(cmd.Val(), 10, 64)
 }
 
 func (cmd *StringCmd) Uint64() (uint64, error) {
 	if cmd.err != nil {
 		return 0, cmd.err
 	}
-	return strconv.ParseUint(cmd.val, 10, 64)
+	return strconv.ParseUint(cmd.Val(), 10, 64)
 }
 
 func (cmd *StringCmd) Float64() (float64, error) {
 	if cmd.err != nil {
 		return 0, cmd.err
 	}
-	return strconv.ParseFloat(cmd.val, 64)
+	return strconv.ParseFloat(cmd.Val(), 64)
 }
 
 func (cmd *StringCmd) Scan(vv interface{}) error {
+	if cmd.err != nil {
+		return cmd.err
+	}
 	switch v := vv.(type) {
 	case nil:
 		return errorf("redis: Scan(nil)")
 	case *string:
-		*v = cmd.val
+		*v = cmd.Val()
 		return nil
 	case *[]byte:
-		*v = []byte(cmd.val)
+		*v = cmd.val
 		return nil
 	case *int:
 		var err error
-		*v, err = strconv.Atoi(cmd.val)
+		*v, err = strconv.Atoi(cmd.Val())
 		return err
 	case *int8:
-		n, err := strconv.ParseInt(cmd.val, 10, 8)
+		n, err := strconv.ParseInt(cmd.Val(), 10, 8)
 		if err != nil {
 			return err
 		}
 		*v = int8(n)
 		return nil
 	case *int16:
-		n, err := strconv.ParseInt(cmd.val, 10, 16)
+		n, err := strconv.ParseInt(cmd.Val(), 10, 16)
 		if err != nil {
 			return err
 		}
 		*v = int16(n)
 		return nil
 	case *int32:
-		n, err := strconv.ParseInt(cmd.val, 10, 16)
+		n, err := strconv.ParseInt(cmd.Val(), 10, 16)
 		if err != nil {
 			return err
 		}
 		*v = int32(n)
 		return nil
 	case *int64:
-		n, err := strconv.ParseInt(cmd.val, 10, 64)
+		n, err := strconv.ParseInt(cmd.Val(), 10, 64)
 		if err != nil {
 			return err
 		}
 		*v = n
 		return nil
 	case *uint:
-		n, err := strconv.ParseUint(cmd.val, 10, 64)
+		n, err := strconv.ParseUint(cmd.Val(), 10, 64)
 		if err != nil {
 			return err
 		}
 		*v = uint(n)
 		return nil
 	case *uint8:
-		n, err := strconv.ParseUint(cmd.val, 10, 8)
+		n, err := strconv.ParseUint(cmd.Val(), 10, 8)
 		if err != nil {
 			return err
 		}
 		*v = uint8(n)
 		return nil
 	case *uint16:
-		n, err := strconv.ParseUint(cmd.val, 10, 16)
+		n, err := strconv.ParseUint(cmd.Val(), 10, 16)
 		if err != nil {
 			return err
 		}
 		*v = uint16(n)
 		return nil
 	case *uint32:
-		n, err := strconv.ParseUint(cmd.val, 10, 32)
+		n, err := strconv.ParseUint(cmd.Val(), 10, 32)
 		if err != nil {
 			return err
 		}
 		*v = uint32(n)
 		return nil
 	case *uint64:
-		n, err := strconv.ParseUint(cmd.val, 10, 64)
+		n, err := strconv.ParseUint(cmd.Val(), 10, 64)
 		if err != nil {
 			return err
 		}
 		*v = n
 		return nil
 	case *float32:
-		n, err := strconv.ParseFloat(cmd.val, 32)
+		n, err := strconv.ParseFloat(cmd.Val(), 32)
 		if err != nil {
 			return err
 		}
@@ -501,13 +516,13 @@ func (cmd *StringCmd) Scan(vv interface{}) error {
 		return err
 	case *float64:
 		var err error
-		*v, err = strconv.ParseFloat(cmd.val, 64)
+		*v, err = strconv.ParseFloat(cmd.Val(), 64)
 		return err
 	case *bool:
-		*v = cmd.val == "1"
+		*v = bytes.Equal(cmd.val, []byte{'1'})
 		return nil
 	default:
-		return Unmarshal([]byte(cmd.val), v)
+		return Unmarshal(cmd.val, v)
 	}
 }
 
@@ -521,7 +536,10 @@ func (cmd *StringCmd) parseReply(rd *bufio.Reader) error {
 		cmd.err = err
 		return err
 	}
-	cmd.val = v.(string)
+	b := v.([]byte)
+	cmd.val = make([]byte, len(b))
+	copy(cmd.val, b)
+	//copy(cmd.val, v.([]byte))
 	return nil
 }
 
@@ -556,7 +574,7 @@ func (cmd *FloatCmd) parseReply(rd *bufio.Reader) error {
 		cmd.err = err
 		return err
 	}
-	cmd.val, cmd.err = strconv.ParseFloat(v.(string), 64)
+	cmd.val, cmd.err = strconv.ParseFloat(string(v.([]byte)), 64)
 	return cmd.err
 }
 
