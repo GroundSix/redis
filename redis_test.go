@@ -238,7 +238,7 @@ func BenchmarkRedisGet(b *testing.B) {
 	})
 }
 
-func BenchmarkRedisBytes(b *testing.B) {
+func BenchmarkRedisGetSetBytes(b *testing.B) {
 	client := redis.NewClient(&redis.Options{
 		Addr: benchRedisAddr,
 	})

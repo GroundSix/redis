@@ -1,6 +1,7 @@
 package redis_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -2337,10 +2338,6 @@ var _ = Describe("Commands", func() {
 	})
 
 	Describe("json marshaling/unmarshaling", func() {
-		type numberStruct struct {
-			Number int
-		}
-
 		BeforeEach(func() {
 			value := &numberStruct{Number: 42}
 			err := client.Set("key", value, 0).Err()
@@ -2363,6 +2360,18 @@ var _ = Describe("Commands", func() {
 	})
 
 })
+
+type numberStruct struct {
+	Number int
+}
+
+func (s *numberStruct) MarshalBinary() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+func (s *numberStruct) UnmarshalBinary(b []byte) error {
+	return json.Unmarshal(b, s)
+}
 
 func deref(viface interface{}) interface{} {
 	v := reflect.ValueOf(viface)
